@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="AE_Launcher/AE_Launcher.vcxproj" Id="39f121c5-574f-4e5d-9638-c2f0ef88dc7d" />
+</Solution>
