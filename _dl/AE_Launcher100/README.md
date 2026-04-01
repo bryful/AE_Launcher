@@ -30,6 +30,10 @@ AE_Launcher -cs
 一応**AE_Launcher.cmd**をダブルクリックで上記のコマンドを実行できます。
 
 
+# 使用ライブラリ
+
+[Dear ImGui](https://github.com/ocornut/imgui)を使用しています。<br>
+
 
 ## Dependency
 Visual studio 2026 C#<br>
