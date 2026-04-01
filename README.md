@@ -1,6 +1,7 @@
 ﻿# AE_Launcher
 
-.aepをダブルクリックすると使用するAfter Effectsのバージョンが選べるアプリです。<br>
+C++で作って軽量・高速のAfter effects バージョン選択ランチャーです。<br>
+.aepをダブルクリックすると使用するAfter Effectsのバージョンが選べます。<br>
 <br>
 [https://github.com/bryful/AepSelector](https://github.com/bryful/AepSelector) と同じものです。<br>
 こちらはC++でコーディングされていて軽量・高速です。<br>
