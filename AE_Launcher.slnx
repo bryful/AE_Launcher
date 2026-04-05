@@ -3,5 +3,8 @@
     <Platform Name="x64" />
     <Platform Name="x86" />
   </Configurations>
-  <Project Path="AE_Launcher/AE_Launcher.vcxproj" Id="39f121c5-574f-4e5d-9638-c2f0ef88dc7d" />
+  <Project Path="AE_Launcher_DxLib/AE_Launcher.vcxproj" Id="dd31b197-2ef3-4ba6-be07-e1bd1bd65b09" />
+  <Project Path="AE_Launcher_imgui/AE_Launcher_imgui.vcxproj" Id="39f121c5-574f-4e5d-9638-c2f0ef88dc7d" />
+  <Project Path="AE_Launcher_win32/AE_Launcher_win32.vcxproj" Id="6487b7f0-f660-44a4-86da-d14e0d289871" />
+  <Project Path="TestC/TestC.vcxproj" Id="f7ac5168-fc55-4ae6-96fb-b668b4a5f183" />
 </Solution>

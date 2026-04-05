@@ -1,42 +1,0 @@
-プロジェクトﾞICON.aepﾞのAdobe After Effects v24.6.8 Windows 64レンダリングログ
-
-レンダリングは2026/04/01、 23:51:10に開始しました。
-
-  2026/04/01 23:51:10 : コンポジションﾞIcon256ﾞの開始
-
-  出力先 : C:\Users\51000291\source\repos\AE_Launcher\AE_Launcher\icon\icc\Icon256_[#####].png    2026/04/01 23:51:10 : コンポジションﾞIcon256ﾞの終了
-
-
-  2026/04/01 23:51:10 : コンポジションﾞIcon016ﾞの開始
-
-  出力先 : C:\Users\51000291\source\repos\AE_Launcher\AE_Launcher\icon\icc\Icon016_[#####].png    2026/04/01 23:51:10 : コンポジションﾞIcon016ﾞの終了
-
-
-  2026/04/01 23:51:10 : コンポジションﾞIcon032ﾞの開始
-
-  出力先 : C:\Users\51000291\source\repos\AE_Launcher\AE_Launcher\icon\icc\Icon032_[#####].png    2026/04/01 23:51:10 : コンポジションﾞIcon032ﾞの終了
-
-
-  2026/04/01 23:51:10 : コンポジションﾞIcon048ﾞの開始
-
-  出力先 : C:\Users\51000291\source\repos\AE_Launcher\AE_Launcher\icon\icc\Icon048_[#####].png    2026/04/01 23:51:10 : コンポジションﾞIcon048ﾞの終了
-
-
-  2026/04/01 23:51:10 : コンポジションﾞIcon064ﾞの開始
-
-  出力先 : C:\Users\51000291\source\repos\AE_Launcher\AE_Launcher\icon\icc\Icon064_[#####].png    2026/04/01 23:51:10 : コンポジションﾞIcon064ﾞの終了
-
-
-  2026/04/01 23:51:10 : コンポジションﾞIcon096ﾞの開始
-
-  出力先 : C:\Users\51000291\source\repos\AE_Launcher\AE_Launcher\icon\icc\Icon096_[#####].png    2026/04/01 23:51:10 : コンポジションﾞIcon096ﾞの終了
-
-
-  2026/04/01 23:51:10 : コンポジションﾞIcon128ﾞの開始
-
-  出力先 : C:\Users\51000291\source\repos\AE_Launcher\AE_Launcher\icon\icc\Icon128_[#####].png    2026/04/01 23:51:10 : コンポジションﾞIcon128ﾞの終了
-
-
-  合計経過時間 : 0 秒
-ログは2026/04/01、23:51:10に閉じられました。
-
