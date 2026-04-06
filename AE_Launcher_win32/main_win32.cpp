@@ -5,7 +5,7 @@
 #include <shellapi.h>
 #include "..\AE_Launcher_DxLib\AfterFXInfo.h"
 #include "..\AE_Launcher_DxLib\au.h"
-
+#include "resource.h"
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "comctl32.lib") // サブクラス化用
@@ -78,6 +78,9 @@ LRESULT CALLBACK ButtonSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
 		// InvalidateRect(GetParent(hWnd), NULL, TRUE);
 		break;
 	}
+	case WM_SETCURSOR:
+		SetCursor(LoadCursor(NULL, IDC_ARROW));
+		return TRUE; // ボタン自身の標準的なカーソル変更を拒否
 	}
 	return DefSubclassProc(hWnd, uMsg, wParam, lParam);
 }
@@ -155,12 +158,16 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 		DragAcceptFiles(hwnd, TRUE);
 		return 0;
 	}
-	/*
+	
 	case WM_MOUSEMOVE:
-		// 通常の移動時もドラッグ時も座標をチェックさせる
-		UpdateFocusByMousePos(hwnd);
-		return 0;
-		*/
+	case WM_NCMOUSEMOVE: // タイトルバー上の動きも監視
+	{
+		// マウスが動いている間、OSが勝手にリングを出そうとするのを上書きし続ける
+		SetCursor(LoadCursor(NULL, IDC_ARROW));
+
+		// 通常の移動処理へ（DefWindowProcに流してもOK）
+		break;
+	}
 	case WM_KEYDOWN:
 	{
 		bool changed = false;
@@ -224,9 +231,13 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 	}
 	case WM_SETCURSOR:
 	{
-		// マウスが動くたびに呼ばれるので、ここで座標をチェック
-		UpdateFocusByMousePos(hwnd);
-		return TRUE;
+		if (LOWORD(lParam) == HTCLIENT) {
+			UpdateFocusByMousePos(hwnd);
+		}
+		// DefWindowProcW に流すと起動直後の IDC_APPSTARTING が復元されるため
+		// すべての領域で IDC_ARROW を強制設定する
+		SetCursor(LoadCursor(NULL, IDC_ARROW));
+		return 1;
 	}
 	case WM_DROPFILES:
 	{
@@ -269,6 +280,39 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 			DestroyWindow(hwnd);
 		return 0;
 	}
+	case WM_CONTEXTMENU:
+	{
+		// 1. メニューハンドルの作成
+		HMENU hMenu = CreatePopupMenu();
+
+		// 2. 項目の追加 (IDは適宜定義してください)
+		AppendMenuW(hMenu, MF_STRING, 101, L"RegisterExtension");
+		AppendMenuW(hMenu, MF_STRING, 102, L"CreateDesktopShortcut開く");
+		AppendMenuW(hMenu, MF_SEPARATOR, 0, NULL); // 区切り線
+		AppendMenuW(hMenu, MF_STRING, 103, L"Quit");
+
+		// 3. 表示位置の取得 (wParamは右クリックされたウィンドウのハンドル)
+		// LOWORD(lParam), HIWORD(lParam) にはスクリーン座標が入っています
+		int x = LOWORD(lParam);
+		int y = HIWORD(lParam);
+
+		// 4. メニューを表示
+		// TPM_RETURNCMD を付けると、選択されたIDが戻り値として返ってきます
+		BOOL id = TrackPopupMenu(hMenu, TPM_LEFTALIGN | TPM_RIGHTBUTTON | TPM_RETURNCMD, x, y, 0, hwnd, NULL);
+
+		// 5. 選択された項目に応じた処理
+		if (id == 101) {
+			au::RegisterExtension();
+		}
+		if (id == 102) {
+			au::CreateDesktopShortcut(L"AE_Launcher");
+		}
+		if (id == 103) PostQuitMessage(0);
+
+		// 6. メニューの破棄（必須）
+		DestroyMenu(hMenu);
+		return 0;
+	}
 	case WM_ERASEBKGND: return 1;
 	case WM_DESTROY: PostQuitMessage(0); return 0;
 	}
@@ -299,7 +343,9 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int nCmdShow) {
 	wc.lpfnWndProc = WindowProc;
 	wc.hInstance = hInst;
 	wc.lpszClassName = CLASS_NAME;
+	wc.hIcon = LoadIcon(hInst, MAKEINTRESOURCE(IDI_ICON1));
 	wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+	//wc.hCursor = NULL;
 	RegisterClassW(&wc);
 
 	int clientW = (BTN_SIZE * g_ai.GetAECount()) + (SPACING * (g_ai.GetAECount() - 1)) + (MARGIN * 2);
@@ -309,7 +355,6 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int nCmdShow) {
 	AdjustWindowRectEx(&wr, style, FALSE, 0);
 	int windowW = wr.right - wr.left;
 	int windowH = wr.bottom - wr.top;
-
 	// 2. マウスカーソルの位置からモニターを特定する
 	POINT pt;
 	GetCursorPos(&pt);
@@ -325,6 +370,7 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int nCmdShow) {
 
 	int x = mi.rcWork.left + (screenW - windowW) / 2;
 	int y = mi.rcWork.top + (screenH - windowH) / 2;
+
 	HWND hwnd = CreateWindowExW(0, CLASS_NAME, L"AE Launcher win32", 
 		style, 
 		x, y, 
@@ -338,7 +384,10 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int nCmdShow) {
 	SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
 
 	ShowWindow(hwnd, nCmdShow);
-
+	// WM_NULL をキューに積んで GetMessage を即時 return させる。
+	// これにより Windows のスタートアップカーソルフィードバック (IDC_APPSTARTING) が
+	// ユーザーがウィンドウにマウスを入れる前に終了する。
+	PostMessage(hwnd, WM_NULL, 0, 0);
 	MSG msg = { };
 	while (GetMessageW(&msg, NULL, 0, 0) > 0) {
 		TranslateMessage(&msg);
