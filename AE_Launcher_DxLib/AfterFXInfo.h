@@ -5,6 +5,9 @@
 #include <string>
 #include <filesystem>
 #include <fstream>
+#include <shellapi.h>
+#include <shlobj.h>
+#include <objbase.h>
 
 namespace fs = std::filesystem;
 class AERenderInfo
@@ -17,6 +20,7 @@ public:
 	std::wstring GetInstalledPath() const { return m_InstalledPath; }
 	std::wstring GetAfterFXPath() const { return m_AfterFXPath; }
 	std::wstring GetVersion() const { return m_Version; }
+	
 	AERenderInfo(const std::wstring& installPath)
 		: m_InstalledPath(installPath)
 	{
@@ -87,6 +91,15 @@ class AfterFXInfo
 				return WStringToString(installedAEs[idx].GetVersion());
 			}
 			return ""; 
+		}
+		int IndexOfVersion(std::string v) const {
+			if (installedAEs.empty()) return -1;
+			for (size_t i = 0; i < installedAEs.size(); ++i) {
+				if (GetVersion((int)i) == v) {
+					return (int)i;
+				}
+			}
+			return -1;
 		}
 		bool GetAllAEInstallations() 
 		{

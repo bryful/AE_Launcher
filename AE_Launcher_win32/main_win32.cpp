@@ -2,21 +2,28 @@
 #include <commctrl.h> // サブクラス化に必要
 #include <string>
 #include <vector>
+#include <shellapi.h>
 #include "..\AE_Launcher_DxLib\AfterFXInfo.h"
+#include "..\AE_Launcher_DxLib\au.h"
 
 #pragma comment(lib, "user32.lib")
 #pragma comment(lib, "gdi32.lib")
 #pragma comment(lib, "comctl32.lib") // サブクラス化用
+#pragma comment(lib, "shell32.lib")
 
-const int BTN_SIZE = 64;
-const int BTN_COUNT = 5;
-const int MARGIN = 12;
+const int BTN_SIZE = 60;
+const int MARGIN = 10;
 const int SPACING = 8;
 const int ID_BUTTON_START = 1000;
+
+//const float BTN_SIZE = 60.0f;
+//const float WINDOW_PADDING = 10.0f;
+//const float ITEM_SPACING = 8.0f; // 追加
 
 static int g_SelectedButton = -1;
 
 static AfterFXInfo g_ai; // AfterFXInfoクラスのインスタンスをグローバルに作成
+static std::string                     lastSelectedVersion = "";
 // --- 文字コード変換 ---
 std::wstring Utf8ToWide(const std::string& utf8) {
 	if (utf8.empty()) return L"";
@@ -25,7 +32,24 @@ std::wstring Utf8ToWide(const std::string& utf8) {
 	MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, &wstr[0], size);
 	return wstr;
 }
-
+// *****************************************************************************************************
+bool CallAfterFX(HWND hwnd, int idx) {
+	if (idx >= 0 && idx < g_ai.GetAECount()) {
+		SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+		ShowWindow(hwnd, SW_HIDE);
+		if (g_ai.CallAfterFX(idx) == false)
+		{
+			ShowWindow(hwnd, SW_SHOW);
+			SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+			SetForegroundWindow(hwnd); // ウィンドウを前面に出す
+			MessageBox(NULL, L"After Effects の起動に失敗しました。", L"Error", MB_OK);
+			return false;
+		}
+		g_ai.SaveVersion("AE_Launcher", g_ai.GetVersion(idx));
+		return true;
+	}
+	return false;
+}
 // --- ボタンのサブクラスプロシージャ (マウスホバー検知用) ---
 LRESULT CALLBACK ButtonSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lParam, UINT_PTR uIdSubclass, DWORD_PTR dwRefData) {
 	switch (uMsg) {
@@ -35,7 +59,9 @@ LRESULT CALLBACK ButtonSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
 		if (g_SelectedButton != index) {
 			g_SelectedButton = index;
 			// 親ウィンドウに再描画を依頼
-			InvalidateRect(GetParent(hWnd), NULL, TRUE);
+			HWND hParent = GetParent(hWnd);
+			RedrawWindow(hParent, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
+			//InvalidateRect(GetParent(hWnd), NULL, TRUE);
 		}
 
 		// マウスが外に出るのを監視開始
@@ -44,6 +70,7 @@ LRESULT CALLBACK ButtonSubclassProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM 
 		tme.hwndTrack = hWnd;
 		TrackMouseEvent(&tme);
 		break;
+
 	}
 	case WM_MOUSELEAVE: {
 		// マウスがボタンから離れたら選択を解除したい場合はここを有効にする
@@ -88,13 +115,35 @@ void DrawMyFlatButton(LPDRAWITEMSTRUCT pdis, const std::wstring& text, bool isAc
 	SelectObject(hdc, hOldFont);
 	DeleteObject(hFont);
 }
+void UpdateFocusByMousePos(HWND hwnd) {
+	POINT pt;
+	if (GetCursorPos(&pt)) {
+		ScreenToClient(hwnd, &pt);
+		HWND hChild = ChildWindowFromPoint(hwnd, pt);
 
+		// 自分（親ウィンドウ）以外の子ウィンドウ（ボタン）がヒットした場合
+		if (hChild && hChild != hwnd) {
+			int btnId = GetDlgCtrlID(hChild);
+			if (btnId >= ID_BUTTON_START && btnId < ID_BUTTON_START + g_ai.GetAECount()) {
+				int index = btnId - ID_BUTTON_START;
+				if (g_SelectedButton != index) {
+					g_SelectedButton = index; // ここで値を更新
+
+					// ★ ここで強制的に描き直させます
+					// RDW_UPDATENOW が「今すぐ描け」という命令です
+					RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
+				}
+				return;
+			}
+		}
+	}
+}
 // --- メインプロシージャ ---
 LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-	static std::vector<std::string> labels = { "TOOL", "PEN", "FILL", "ZOOM", "SET" };
 
 	switch (uMsg) {
 	case WM_CREATE:
+	{
 		for (int i = 0; i < g_ai.GetAECount(); i++) {
 			HWND hBtn = CreateWindowW(L"BUTTON", L"", WS_VISIBLE | WS_CHILD | BS_OWNERDRAW | WS_TABSTOP,
 				MARGIN + (i * (BTN_SIZE + SPACING)), MARGIN, BTN_SIZE, BTN_SIZE,
@@ -103,25 +152,34 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 			// ★サブクラス化を設定 (iをインデックスとして渡す)
 			SetWindowSubclass(hBtn, ButtonSubclassProc, 0, (DWORD_PTR)i);
 		}
+		DragAcceptFiles(hwnd, TRUE);
 		return 0;
-
+	}
+	/*
+	case WM_MOUSEMOVE:
+		// 通常の移動時もドラッグ時も座標をチェックさせる
+		UpdateFocusByMousePos(hwnd);
+		return 0;
+		*/
 	case WM_KEYDOWN:
 	{
 		bool changed = false;
 		switch (wParam) {
 		case VK_LEFT:
-			if (g_SelectedButton <= 0) g_SelectedButton = BTN_COUNT - 1;
+			if (g_SelectedButton <= 0) g_SelectedButton = g_ai.GetAECount() - 1;
 			else g_SelectedButton--;
 			changed = true;
 			break;
 		case VK_RIGHT:
-			if (g_SelectedButton >= BTN_COUNT - 1 || g_SelectedButton == -1) g_SelectedButton = 0;
+			if (g_SelectedButton >= g_ai.GetAECount() - 1 || g_SelectedButton == -1) g_SelectedButton = 0;
 			else g_SelectedButton++;
 			changed = true;
 			break;
 		case VK_RETURN:
-			if (g_SelectedButton != -1) {
-				SendMessage(hwnd, WM_COMMAND, MAKEWPARAM(ID_BUTTON_START + g_SelectedButton, BN_CLICKED), 0);
+			if (g_SelectedButton >= 0 && g_SelectedButton < g_ai.GetAECount()) {
+				CallAfterFX(hwnd, g_SelectedButton);
+				DestroyWindow(hwnd);
+				//SendMessage(hwnd, WM_COMMAND, MAKEWPARAM(ID_BUTTON_START + g_SelectedButton, BN_CLICKED), 0);
 			}
 			break;
 		}
@@ -130,21 +188,26 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 	}
 
 	case WM_COMMAND:
-		if (LOWORD(wParam) >= ID_BUTTON_START && LOWORD(wParam) < ID_BUTTON_START + BTN_COUNT) {
+		if (LOWORD(wParam) >= ID_BUTTON_START && LOWORD(wParam) < ID_BUTTON_START + g_ai.GetAECount()) {
 			g_SelectedButton = LOWORD(wParam) - ID_BUTTON_START;
-			InvalidateRect(hwnd, NULL, TRUE);
-			UpdateWindow(hwnd);
-			std::wstring msg = Utf8ToWide(labels[g_SelectedButton]) + L" モードを選択";
-			MessageBoxW(hwnd, msg.c_str(), L"Event", MB_OK | MB_TOPMOST);
+			if (g_SelectedButton >= 0 && g_SelectedButton < g_ai.GetAECount()) {
+				CallAfterFX(hwnd, g_SelectedButton);
+				DestroyWindow(hwnd);
+				//SendMessage(hwnd, WM_COMMAND, MAKEWPARAM(ID_BUTTON_START + g_SelectedButton, BN_CLICKED), 0);
+			}
+			//InvalidateRect(hwnd, NULL, TRUE);
+			//UpdateWindow(hwnd);
+			//std::wstring msg = Utf8ToWide(g_ai.GetVersion(g_SelectedButton)) + L" モードを選択";
+			//MessageBoxW(hwnd, msg.c_str(), L"Event", MB_OK | MB_TOPMOST);
 		}
 		return 0;
 
 	case WM_DRAWITEM:
 	{
 		LPDRAWITEMSTRUCT pdis = (LPDRAWITEMSTRUCT)lParam;
-		if (pdis->CtlID >= ID_BUTTON_START && pdis->CtlID < ID_BUTTON_START + BTN_COUNT) {
-			int idx = pdis->CtlID - ID_BUTTON_START;
-			DrawMyFlatButton(pdis, Utf8ToWide(g_ai.GetVersion(idx)), (pdis->CtlID - ID_BUTTON_START == g_SelectedButton));
+		int idx = pdis->CtlID - ID_BUTTON_START;
+		if (idx>=0 && idx < g_ai.GetAECount()) {
+			DrawMyFlatButton(pdis, Utf8ToWide(g_ai.GetVersion(idx)), (idx == g_SelectedButton));
 		}
 		return TRUE;
 	}
@@ -159,6 +222,53 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) 
 		EndPaint(hwnd, &ps);
 		return 0;
 	}
+	case WM_SETCURSOR:
+	{
+		// マウスが動くたびに呼ばれるので、ここで座標をチェック
+		UpdateFocusByMousePos(hwnd);
+		return TRUE;
+	}
+	case WM_DROPFILES:
+	{
+		HDROP hDrop = (HDROP)wParam;
+		POINT pt;
+		bool finFlag = false;
+		// 1. ドロップされた位置（ウィンドウ相対座標）を取得
+		DragQueryPoint(hDrop, &pt);
+
+		// 2. その座標にある子ウィンドウ（ボタン）のハンドルを取得
+		HWND hChild = ChildWindowFromPoint(hwnd, pt);
+
+		if (hChild != NULL) {
+			// 3. ボタンのIDを取得して、どのボタンか判定
+			int btnId = GetDlgCtrlID(hChild);
+
+			if (btnId >= ID_BUTTON_START && btnId < ID_BUTTON_START + g_ai.GetAECount()) {
+				int index = btnId - ID_BUTTON_START;
+				g_SelectedButton = index;
+				RedrawWindow(hwnd, NULL, NULL, RDW_INVALIDATE | RDW_UPDATENOW | RDW_ALLCHILDREN);
+				// ファイルパスの取得（最初の1つだけ例）
+				UINT pathLen = DragQueryFileW(hDrop, 0, NULL, 0);
+				std::wstring filePath(pathLen, L'\0');
+				DragQueryFileW(hDrop, 0, &filePath[0], pathLen + 1);
+
+				g_ai.SetTargetAepPath(filePath);
+				// ボタンごとの個別処理
+				//std::wstring msg = L"ボタン [" + std::to_wstring(index + 1) + L"] に\n" + filePath + L"\nをドロップしました。";
+				//MessageBoxW(hwnd, msg.c_str(), L"Drop Event", MB_OK | MB_TOPMOST);
+				if (g_SelectedButton >= 0 && g_SelectedButton < g_ai.GetAECount()) {
+					CallAfterFX(hwnd, g_SelectedButton);
+					finFlag = true;
+					//SendMessage(hwnd, WM_COMMAND, MAKEWPARAM(ID_BUTTON_START + g_SelectedButton, BN_CLICKED), 0);
+				}
+			}
+		}
+
+		DragFinish(hDrop);
+		if (finFlag)
+			DestroyWindow(hwnd);
+		return 0;
+	}
 	case WM_ERASEBKGND: return 1;
 	case WM_DESTROY: PostQuitMessage(0); return 0;
 	}
@@ -169,7 +279,21 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int nCmdShow) {
 	if (!g_ai.IsInstalled()) {
 		MessageBoxW(NULL, L"After Effects が見つかりませんでした。", L"Error", MB_OK);
 		return -1;
-	}   
+	}
+	au au;
+	if (au.FindOption("inst") >= 0) {
+		au.RegisterExtension();
+		MessageBox(NULL, L"拡張子割り当て", L"完了", MB_OK);
+		return 0;
+	}
+	else if (au.FindOption("cs") >= 0) {
+		au.CreateDesktopShortcut(L"AE_Launcher");
+		MessageBox(NULL, L"デスクトップにショートカットを作成しました。", L"完了", MB_OK);
+		return 0;
+	}
+	g_ai.SetTargetAepPath(au.FindAep());
+	lastSelectedVersion = g_ai.LoadVersion("AE_Launcher");
+	g_SelectedButton = g_ai.IndexOfVersion(lastSelectedVersion);
 	const wchar_t CLASS_NAME[] = L"FlatToolApp";
 	WNDCLASSW wc = { };
 	wc.lpfnWndProc = WindowProc;
@@ -210,6 +334,9 @@ int WINAPI wWinMain(HINSTANCE hInst, HINSTANCE, PWSTR, int nCmdShow) {
 		hInst,
 		NULL);
 	if (!hwnd) return 0;
+
+	SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
+
 	ShowWindow(hwnd, nCmdShow);
 
 	MSG msg = { };

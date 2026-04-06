@@ -40,7 +40,7 @@ void CleanupRenderTarget();
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 
-
+// *****************************************************************************************************
 bool CallAfterFX(int idx) {
 	if (idx >= 0 && idx < g_ai.GetAECount()) {
 		SetWindowPos(MainWindowHandle, HWND_NOTOPMOST, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE);
@@ -57,6 +57,7 @@ bool CallAfterFX(int idx) {
 	}
 	return false;
 }
+// *****************************************************************************************************
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
 {
 	HRESULT hrCom = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
@@ -180,6 +181,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
 	CoUninitialize(); // ★ 通常終了時の終了処理を追加
 	return 0;
 }
+// *****************************************************************************************************
 
 bool CreateDeviceD3D(HWND hWnd) {
 	DXGI_SWAP_CHAIN_DESC sd = {};
@@ -190,23 +192,27 @@ bool CreateDeviceD3D(HWND hWnd) {
 	if (S_OK != D3D11CreateDeviceAndSwapChain(nullptr, D3D_DRIVER_TYPE_HARDWARE, nullptr, 0, flA, 2, D3D11_SDK_VERSION, &sd, &g_pSwapChain, &g_pd3dDevice, &fl, &g_pd3dDeviceContext)) return false;
 	CreateRenderTarget(); return true;
 }
+// *****************************************************************************************************
 void CleanupDeviceD3D() {
 	CleanupRenderTarget();
 	if (g_pSwapChain) g_pSwapChain->Release();
 	if (g_pd3dDeviceContext) g_pd3dDeviceContext->Release();
 	if (g_pd3dDevice) g_pd3dDevice->Release();
 }
-void CreateRenderTarget() { 
+// *****************************************************************************************************
+void CreateRenderTarget() {
 	ID3D11Texture2D* pB; 
 	g_pSwapChain->GetBuffer(0, IID_PPV_ARGS(&pB)); 
 	g_pd3dDevice->CreateRenderTargetView(pB, nullptr, &g_mainRenderTargetView); 
 	
 	pB->Release(); 
 }
+// *****************************************************************************************************
 void CleanupRenderTarget() {
 	if (g_mainRenderTargetView) 
 		g_mainRenderTargetView->Release(); 
 }
+// *****************************************************************************************************
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT WINAPI WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam) {
 	if (ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam)) return true;
